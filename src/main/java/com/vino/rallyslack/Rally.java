@@ -6,7 +6,7 @@ public class Rally {
 	
 	private String message;
 	
-	private List<TimeEntry> timeList;
+	private List<TimeEntry> TimeSheetEntries;
 
 	public String getMessage() {
 		return message;
@@ -16,16 +16,13 @@ public class Rally {
 		this.message = message;
 	}
 
-	public List<TimeEntry> getTimeList() {
-		return timeList;
+	public List<TimeEntry> getTimeSheetEntries() {
+		return TimeSheetEntries;
 	}
 
-	public void setTimeList(List<TimeEntry> timeList) {
-		this.timeList = timeList;
+	public void setTimeSheetEntries(List<TimeEntry> timeSheetEntries) {
+		TimeSheetEntries = timeSheetEntries;
 	}
-	
-	
-	
-	
 
+	
 }

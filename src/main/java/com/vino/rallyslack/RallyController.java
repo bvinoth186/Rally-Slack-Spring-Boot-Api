@@ -245,7 +245,7 @@ public class RallyController {
 		}
 
 		Rally rally = new Rally();
-		rally.setTimeList(timeEntryList);
+		rally.setTimeSheetEntries(timeEntryList);
 		rally.setMessage(message);
 		return rally;
 	}
