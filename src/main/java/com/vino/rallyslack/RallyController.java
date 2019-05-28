@@ -145,9 +145,11 @@ public class RallyController {
 
 			if (itemJsonObject.get("Task") != JsonNull.INSTANCE) {
 				String taskName = itemJsonObject.get("Task").getAsJsonObject().get("_refObjectName").toString();
+				taskName = taskName.replace("\"", "");
 
 				if (!taskName.toUpperCase().contains("Project Meetings".toUpperCase())) {
 					String user = itemJsonObject.get("User").getAsJsonObject().get("_refObjectName").toString();
+					user = user.replace("\"", "");
 
 					List<String> taksList = timeMap.get(user);
 					if (taksList == null) {
