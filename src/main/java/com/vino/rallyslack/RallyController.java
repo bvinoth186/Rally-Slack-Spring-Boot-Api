@@ -42,7 +42,7 @@ public class RallyController {
 	
 	private String DEFAULT_PROJECT = "Brainiacs";
 	
-	private String INVALID_USAGE = "Invalid Usage";
+	private String INVALID_USAGE = "Invalid Usage, use /fly-rally-timesheet {Rally Project Name},{Date in YYYY-MM-dd format} Eg: /fly-rally-timesheet Brainiacs,2019-05-29";
 	
 	private String SLACK_RESPONSE_TYPE = "in_channel";
 	
