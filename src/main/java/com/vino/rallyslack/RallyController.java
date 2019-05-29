@@ -38,6 +38,8 @@ public class RallyController {
 	private String SUCCESS = "Success";
 
 	private String ERROR = "Internal Server Error";
+	
+	private String DEFAULT_PROJECT = "Brainiacs";
 
 	@Value("${apikey}")
 	private String apikey;
@@ -87,10 +89,19 @@ public class RallyController {
 	}
 	
 	@RequestMapping(value = "/timeentry", method = RequestMethod.POST )
-	public ResponseEntity<String> timeentryByPost(@RequestBody MultiValueMap<String, String> map) throws Exception {
-		System.out.println(map);
+	public ResponseEntity<String> timeentryByPost(@RequestBody MultiValueMap<String, String> bodyMap) throws Exception {
+		System.out.println(bodyMap);
+		List<String> inputList = bodyMap.get("text");
 		
-		List<TimeEntry> timeEntryList = processTimeEntry(null, "2019-05-28");
+		String project = DEFAULT_PROJECT;
+		System.out.println("Input");
+		for (Iterator iterator = inputList.iterator(); iterator.hasNext();) {
+			String string = (String) iterator.next();
+			System.out.println(string);
+		}
+		
+		
+		List<TimeEntry> timeEntryList = processTimeEntry(project, "2019-05-28");
 		
 		String result = "";
 		for (Iterator<TimeEntry> iterator = timeEntryList.iterator(); iterator.hasNext();) {
@@ -140,6 +151,10 @@ public class RallyController {
 		}
 		QueryFilter queryFilter = getQueryFilterStringByDate(inputDateStr);
 		System.out.println("queryFilter : " + queryFilter);
+		
+		if (queryFilter == null) {
+			return timeEntryList;
+		}
 
 		QueryRequest timeRequest = new QueryRequest("TimeEntryValue");
 		timeRequest.setQueryFilter(queryFilter);
@@ -209,25 +224,30 @@ public class RallyController {
 
 	private QueryFilter getQueryFilterStringByDate(String inputDateStr) {
 
-		LocalDate current = null;
-		DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+		QueryFilter filter = null;
+		try {
+			LocalDate current = null;
+			DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
-		if (inputDateStr == null) {
-			current = LocalDate.now();
-		} else {
-			current = LocalDate.parse(inputDateStr, formatter);
+			if (inputDateStr == null) {
+				current = LocalDate.now();
+			} else {
+				current = LocalDate.parse(inputDateStr, formatter);
+			}
+
+			LocalDate next = current.plusDays(1);
+			LocalDate prev = current.minusDays(1);
+
+			String nextStr = next.format(formatter);
+			String prevStr = prev.format(formatter);
+
+			prevStr = "\"" + prevStr + "\"";
+			nextStr = "\"" + nextStr + "\"";
+
+			filter = new QueryFilter("DateVal", ">", prevStr).and(new QueryFilter("DateVal", "<", nextStr));
+		} catch (Exception e) {
+			e.printStackTrace();
 		}
-
-		LocalDate next = current.plusDays(1);
-		LocalDate prev = current.minusDays(1);
-
-		String nextStr = next.format(formatter);
-		String prevStr = prev.format(formatter);
-
-		prevStr = "\"" + prevStr + "\"";
-		nextStr = "\"" + nextStr + "\"";
-
-		QueryFilter filter = new QueryFilter("DateVal", ">", prevStr).and(new QueryFilter("DateVal", "<", nextStr));
 
 		return filter;
 	}
@@ -235,7 +255,7 @@ public class RallyController {
 	private String getProjectRefByName(RallyRestApi restApi, String projectName) throws IOException {
 
 		if (projectName == null) {
-			projectName = "Brainiacs";
+			projectName = DEFAULT_PROJECT;
 		}
 		QueryRequest storyRequest = new QueryRequest("project");
 		storyRequest.setFetch(new Fetch("Name", "ObjectID"));
@@ -253,11 +273,7 @@ public class RallyController {
 		return projectRef;
 	}
 
-	private RallyRestApi getRallyRestApi() throws Exception {
-
-		URI server = new URI("https://rally1.rallydev.com");
-		return new RallyRestApi(server, apikey);
-	}
+	
 
 	private Rally getRallyResponse(List<TimeEntry> timeEntryList, HttpStatus status) {
 
@@ -286,14 +302,30 @@ public class RallyController {
 		return status;
 	}
 	
+	private RallyRestApi getRallyRestApi() throws Exception {
+
+		URI server = new URI("https://rally1.rallydev.com");
+		return new RallyRestApi(server, apikey);
+	}
+	
 	public static void main(String args[]) throws Exception {
 		
+		String project = "Brainiacs";
+		
+		String date = "2019-05-29";
+		
 		RallyController rallyController = new RallyController();
-		List<TimeEntry> timeEntryList = rallyController.processTimeEntry(null, "2019-05-28");
+		List<TimeEntry> timeEntryList = rallyController.processTimeEntry(project, date);
 		HttpStatus status = rallyController.getHttpStatusCode(timeEntryList);
 		Rally rally = rallyController.getRallyResponse(timeEntryList, status);
 		
-		String result = "";
+		
+		
+		String result = "`" + project + " Staus Update - " + date + "`" + "\n";
+		
+		if (timeEntryList == null || timeEntryList.isEmpty()) {
+			result = result + "    " + "- " + "No Records Found";
+		}
 		for (Iterator iterator = timeEntryList.iterator(); iterator.hasNext();) {
 			TimeEntry timeEntry = (TimeEntry) iterator.next();
 			
