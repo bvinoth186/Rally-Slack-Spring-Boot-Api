@@ -104,15 +104,17 @@ public class RallyController {
 		String result = "";
 		if (inputList != null && !inputList.isEmpty()) {
 			String input = inputList.get(0);
-			StringTokenizer token = new StringTokenizer(input, ",");
-			if (token.countTokens() == 2) {
-				project = token.nextElement().toString();
-				date = token.nextElement().toString();
-			} else if (token.countTokens() == 1) {
-				project = input;
-			} else {
-				result = INVALID_USAGE;
-				return new ResponseEntity<String>(result, HttpStatus.OK);
+			if (input != null && input.length() > 0) {
+				StringTokenizer token = new StringTokenizer(input, ",");
+				if (token.countTokens() == 2) {
+					project = token.nextElement().toString();
+					date = token.nextElement().toString();
+				} else if (token.countTokens() == 1) {
+					project = input;
+				} else {
+					result = INVALID_USAGE;
+					return new ResponseEntity<String>(result, HttpStatus.OK);
+				}
 			}
 		}
 		
