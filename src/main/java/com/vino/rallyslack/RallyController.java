@@ -102,9 +102,9 @@ public class RallyController {
 		String date = getTodaysDate();
 	
 		String result = "";
-		if (!inputList.isEmpty()) {
+		if (inputList != null && !inputList.isEmpty()) {
 			String input = inputList.get(0);
-			StringTokenizer token = new StringTokenizer(input, "::");
+			StringTokenizer token = new StringTokenizer(input, ",");
 			if (token.countTokens() == 2) {
 				project = token.nextElement().toString();
 				date = token.nextElement().toString();
@@ -119,6 +119,11 @@ public class RallyController {
 		List<TimeEntry> timeEntryList = processTimeEntry(project, date);
 		
 		result = "`" + project + " Staus Update - " + date + "`" + "\n";
+		
+		if (timeEntryList == null || timeEntryList.isEmpty()) {
+			result = result +  "    " + "- " + "No Records Found";
+			return new ResponseEntity<String>(result, HttpStatus.OK);
+		}
 		
 		for (Iterator<TimeEntry> iterator = timeEntryList.iterator(); iterator.hasNext();) {
 			TimeEntry timeEntry = (TimeEntry) iterator.next();
@@ -136,14 +141,15 @@ public class RallyController {
 
 	private List<TimeEntry> processTimeEntry(String project, String date) throws Exception {
 
-		System.out.println("Input Project : " + project + " Input Date " + date);
+		System.out.println("Input Project : " + project + ", Input Date " + date);
 		List<TimeEntry> timeEntryList = null;
+		
 
 		RallyRestApi restApi = null;
 		try {
-			restApi = getRallyRestApi();
+//			restApi = getRallyRestApi();
 
-			timeEntryList = getTimeEntries(restApi, date, project);
+//			timeEntryList = getTimeEntries(restApi, date, project);
 
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -333,6 +339,8 @@ public class RallyController {
 	
 	public static void main(String args[]) throws Exception {
 		
+		RallyController rallyController = new RallyController(); 
+//		System.out.println(rallyController.getTodaysDate());
 		/*
 		 * String project = "Brainiacs";
 		 * 
@@ -359,16 +367,28 @@ public class RallyController {
 		 * iterator2.next(); result = result + "    " + "- " + task + "\n"; } }
 		 */
 		
-		String input = "Brainiacs2019-05-29::";
-		StringTokenizer token = new StringTokenizer(input, "::");
-		if (token.countTokens() == 2) {
-			System.out.println(token.nextElement().toString());
-			System.out.println(token.nextElement().toString());
-		} else if (token.countTokens() == 1) {
-			System.out.println(input);
-		} else {
-			System.out.println("error");
-		}
+		/*
+		 * String input = "Brainiacs2019-05-29::"; StringTokenizer token = new
+		 * StringTokenizer(input, "::"); if (token.countTokens() == 2) {
+		 * System.out.println(token.nextElement().toString());
+		 * System.out.println(token.nextElement().toString()); } else if
+		 * (token.countTokens() == 1) { System.out.println(input); } else {
+		 * System.out.println("error"); }
+		 */
+		
+		
+			String input = "Brainiacs,,2019,-05-29";
+			StringTokenizer token = new StringTokenizer(input, ",");
+			int count = token.countTokens();
+			System.out.println(count);
+			if (count == 2) {
+				System.out.println(token.nextElement().toString());
+				System.out.println(token.nextElement().toString());
+			} else if (count == 1) {
+				System.out.println(token.nextElement().toString());
+			} else {
+				System.out.println("error");
+			}
 		
 		
 		
