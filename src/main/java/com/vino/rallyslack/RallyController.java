@@ -10,6 +10,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.StringTokenizer;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
@@ -40,6 +41,10 @@ public class RallyController {
 	private String ERROR = "Internal Server Error";
 	
 	private String DEFAULT_PROJECT = "Brainiacs";
+	
+	private String INVALID_USAGE = "Invalid Usage";
+	
+	private DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
 	@Value("${apikey}")
 	private String apikey;
@@ -94,16 +99,27 @@ public class RallyController {
 		List<String> inputList = bodyMap.get("text");
 		
 		String project = DEFAULT_PROJECT;
-		System.out.println("Input");
-		for (Iterator iterator = inputList.iterator(); iterator.hasNext();) {
-			String string = (String) iterator.next();
-			System.out.println(string);
+		String date = getTodaysDate();
+	
+		String result = "";
+		if (!inputList.isEmpty()) {
+			String input = inputList.get(0);
+			StringTokenizer token = new StringTokenizer(input, "::");
+			if (token.countTokens() == 2) {
+				project = token.nextElement().toString();
+				date = token.nextElement().toString();
+			} else if (token.countTokens() == 1) {
+				project = input;
+			} else {
+				result = INVALID_USAGE;
+				return new ResponseEntity<String>(result, HttpStatus.OK);
+			}
 		}
 		
+		List<TimeEntry> timeEntryList = processTimeEntry(project, date);
 		
-		List<TimeEntry> timeEntryList = processTimeEntry(project, "2019-05-28");
+		result = "`" + project + " Staus Update - " + date + "`" + "\n";
 		
-		String result = "";
 		for (Iterator<TimeEntry> iterator = timeEntryList.iterator(); iterator.hasNext();) {
 			TimeEntry timeEntry = (TimeEntry) iterator.next();
 			
@@ -120,6 +136,7 @@ public class RallyController {
 
 	private List<TimeEntry> processTimeEntry(String project, String date) throws Exception {
 
+		System.out.println("Input Project : " + project + " Input Date " + date);
 		List<TimeEntry> timeEntryList = null;
 
 		RallyRestApi restApi = null;
@@ -227,8 +244,7 @@ public class RallyController {
 		QueryFilter filter = null;
 		try {
 			LocalDate current = null;
-			DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
-
+			
 			if (inputDateStr == null) {
 				current = LocalDate.now();
 			} else {
@@ -250,6 +266,13 @@ public class RallyController {
 		}
 
 		return filter;
+	}
+	
+	private String getTodaysDate() {
+		
+		LocalDate current = LocalDate.now();
+		return current.format(formatter);
+		
 	}
 
 	private String getProjectRefByName(RallyRestApi restApi, String projectName) throws IOException {
@@ -310,35 +333,44 @@ public class RallyController {
 	
 	public static void main(String args[]) throws Exception {
 		
-		String project = "Brainiacs";
+		/*
+		 * String project = "Brainiacs";
+		 * 
+		 * String date = "2019-05-29";
+		 * 
+		 * RallyController rallyController = new RallyController(); List<TimeEntry>
+		 * timeEntryList = rallyController.processTimeEntry(project, date); HttpStatus
+		 * status = rallyController.getHttpStatusCode(timeEntryList); Rally rally =
+		 * rallyController.getRallyResponse(timeEntryList, status);
+		 * 
+		 * 
+		 * 
+		 * String result = "`" + project + " Staus Update - " + date + "`" + "\n";
+		 * 
+		 * if (timeEntryList == null || timeEntryList.isEmpty()) { result = result +
+		 * "    " + "- " + "No Records Found"; } for (Iterator iterator =
+		 * timeEntryList.iterator(); iterator.hasNext();) { TimeEntry timeEntry =
+		 * (TimeEntry) iterator.next();
+		 * 
+		 * result = result + timeEntry.getName() + "\n";
+		 * 
+		 * List<String> taskList = timeEntry.getTasks(); for (Iterator iterator2 =
+		 * taskList.iterator(); iterator2.hasNext();) { String task = (String)
+		 * iterator2.next(); result = result + "    " + "- " + task + "\n"; } }
+		 */
 		
-		String date = "2019-05-29";
-		
-		RallyController rallyController = new RallyController();
-		List<TimeEntry> timeEntryList = rallyController.processTimeEntry(project, date);
-		HttpStatus status = rallyController.getHttpStatusCode(timeEntryList);
-		Rally rally = rallyController.getRallyResponse(timeEntryList, status);
-		
-		
-		
-		String result = "`" + project + " Staus Update - " + date + "`" + "\n";
-		
-		if (timeEntryList == null || timeEntryList.isEmpty()) {
-			result = result + "    " + "- " + "No Records Found";
+		String input = "Brainiacs2019-05-29::";
+		StringTokenizer token = new StringTokenizer(input, "::");
+		if (token.countTokens() == 2) {
+			System.out.println(token.nextElement().toString());
+			System.out.println(token.nextElement().toString());
+		} else if (token.countTokens() == 1) {
+			System.out.println(input);
+		} else {
+			System.out.println("error");
 		}
-		for (Iterator iterator = timeEntryList.iterator(); iterator.hasNext();) {
-			TimeEntry timeEntry = (TimeEntry) iterator.next();
-			
-			result = result + timeEntry.getName() + "\n";
-			
-			List<String> taskList = timeEntry.getTasks();
-			for (Iterator iterator2 = taskList.iterator(); iterator2.hasNext();) {
-				String task = (String) iterator2.next();
-				result = result + "    " + "- " + task + "\n";
-			}
-		}
 		
-		System.out.println(result);
+		
 		
 	}
 
