@@ -14,6 +14,8 @@ import java.util.Set;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.util.MultiValueMap;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -62,6 +64,8 @@ public class RallyController {
 		Rally rally = getRallyResponse(timeEntryList, status);
 		return new ResponseEntity<Rally>(rally, status);
 	}
+	
+	
 
 	@RequestMapping(value = "/timeentry", params = { "project", "date" }, method = RequestMethod.GET)
 	public ResponseEntity<Rally> timeentryByProjectAndDate(@RequestParam("project") String project,
@@ -80,6 +84,27 @@ public class RallyController {
 		HttpStatus status = getHttpStatusCode(timeEntryList);
 		Rally rally = getRallyResponse(timeEntryList, status);
 		return new ResponseEntity<Rally>(rally, status);
+	}
+	
+	@RequestMapping(value = "/timeentry", method = RequestMethod.POST )
+	public ResponseEntity<String> timeentryByPost(@RequestBody MultiValueMap<String, String> map) throws Exception {
+		System.out.println(map);
+		
+		List<TimeEntry> timeEntryList = processTimeEntry(null, "2019-05-28");
+		
+		String result = "";
+		for (Iterator<TimeEntry> iterator = timeEntryList.iterator(); iterator.hasNext();) {
+			TimeEntry timeEntry = (TimeEntry) iterator.next();
+			
+			result = result + timeEntry.getName() + "\n";
+			
+			List<String> taskList = timeEntry.getTasks();
+			for (Iterator<String> iterator2 = taskList.iterator(); iterator2.hasNext();) {
+				String task = (String) iterator2.next();
+				result = result + "    " + "- " + task + "\n";
+			}
+		}
+		return new ResponseEntity<String>(result, HttpStatus.OK);
 	}
 
 	private List<TimeEntry> processTimeEntry(String project, String date) throws Exception {
@@ -231,7 +256,6 @@ public class RallyController {
 	private RallyRestApi getRallyRestApi() throws Exception {
 
 		URI server = new URI("https://rally1.rallydev.com");
-		System.out.println("apikey " + apikey);
 		return new RallyRestApi(server, apikey);
 	}
 
@@ -260,6 +284,30 @@ public class RallyController {
 		}
 
 		return status;
+	}
+	
+	public static void main(String args[]) throws Exception {
+		
+		RallyController rallyController = new RallyController();
+		List<TimeEntry> timeEntryList = rallyController.processTimeEntry(null, "2019-05-28");
+		HttpStatus status = rallyController.getHttpStatusCode(timeEntryList);
+		Rally rally = rallyController.getRallyResponse(timeEntryList, status);
+		
+		String result = "";
+		for (Iterator iterator = timeEntryList.iterator(); iterator.hasNext();) {
+			TimeEntry timeEntry = (TimeEntry) iterator.next();
+			
+			result = result + timeEntry.getName() + "\n";
+			
+			List<String> taskList = timeEntry.getTasks();
+			for (Iterator iterator2 = taskList.iterator(); iterator2.hasNext();) {
+				String task = (String) iterator2.next();
+				result = result + "    " + "- " + task + "\n";
+			}
+		}
+		
+		System.out.println(result);
+		
 	}
 
 }
