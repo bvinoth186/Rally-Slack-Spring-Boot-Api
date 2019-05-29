@@ -149,9 +149,9 @@ public class RallyController {
 
 		RallyRestApi restApi = null;
 		try {
-//			restApi = getRallyRestApi();
+			restApi = getRallyRestApi();
 
-//			timeEntryList = getTimeEntries(restApi, date, project);
+			timeEntryList = getTimeEntries(restApi, date, project);
 
 		} catch (Exception e) {
 			e.printStackTrace();
