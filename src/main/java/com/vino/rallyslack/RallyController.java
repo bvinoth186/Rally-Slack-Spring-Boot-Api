@@ -44,6 +44,8 @@ public class RallyController {
 	
 	private String INVALID_USAGE = "Invalid Usage";
 	
+	private String SLACK_RESPONSE_TYPE = "in_channel";
+	
 	private DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
 	@Value("${apikey}")
@@ -94,7 +96,7 @@ public class RallyController {
 	}
 	
 	@RequestMapping(value = "/timeentry", method = RequestMethod.POST )
-	public ResponseEntity<String> timeentryByPost(@RequestBody MultiValueMap<String, String> bodyMap) throws Exception {
+	public ResponseEntity<Slack> timeentryByPost(@RequestBody MultiValueMap<String, String> bodyMap) throws Exception {
 		System.out.println(bodyMap);
 		List<String> inputList = bodyMap.get("text");
 		
@@ -113,18 +115,18 @@ public class RallyController {
 					project = input;
 				} else {
 					result = INVALID_USAGE;
-					return new ResponseEntity<String>(result, HttpStatus.OK);
+					return new ResponseEntity<Slack>(new Slack(SLACK_RESPONSE_TYPE, result), HttpStatus.OK);
 				}
 			}
 		}
 		
 		List<TimeEntry> timeEntryList = processTimeEntry(project, date);
 		
-		result = "`" + project + " Staus Update - " + date + "`" + "\n";
+		result = "`" + project + " Staus Update - " + date + "`" + "\n" + "----------------------------------------------------------\n\n";
 		
 		if (timeEntryList == null || timeEntryList.isEmpty()) {
 			result = result +  "    " + "- " + "No Records Found";
-			return new ResponseEntity<String>(result, HttpStatus.OK);
+			return new ResponseEntity<Slack>(new Slack(SLACK_RESPONSE_TYPE, result), HttpStatus.OK);
 		}
 		
 		for (Iterator<TimeEntry> iterator = timeEntryList.iterator(); iterator.hasNext();) {
@@ -137,8 +139,9 @@ public class RallyController {
 				String task = (String) iterator2.next();
 				result = result + "    " + "- " + task + "\n";
 			}
+			result = result + "\n";
 		}
-		return new ResponseEntity<String>(result, HttpStatus.OK);
+		return new ResponseEntity<Slack>(new Slack(SLACK_RESPONSE_TYPE, result), HttpStatus.OK);
 	}
 
 	private List<TimeEntry> processTimeEntry(String project, String date) throws Exception {
@@ -224,11 +227,6 @@ public class RallyController {
 					timeMap.put(user, taksList);
 				}
 
-				/*
-				 * if (!taskName.toUpperCase().contains("Project Meetings".toUpperCase())) {
-				 * String results = results + "Name : " + user + ", Task : " + taskName // +
-				 * ", Date : " + timeJsonObject.get("DateVal") + "\n"; } }
-				 */
 			}
 		}
 
