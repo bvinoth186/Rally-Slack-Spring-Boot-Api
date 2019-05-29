@@ -122,7 +122,7 @@ public class RallyController {
 		
 		List<TimeEntry> timeEntryList = processTimeEntry(project, date);
 		
-		result = "`" + project + " Staus Update - " + date + "`" + "\n" + "----------------------------------------------------------\n\n";
+		result = "`" + project + " Staus Update - " + date + "`" + "\n" + "============================================================\n";
 		
 		if (timeEntryList == null || timeEntryList.isEmpty()) {
 			result = result +  "    " + "- " + "No Records Found";
