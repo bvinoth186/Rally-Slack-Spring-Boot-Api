@@ -177,7 +177,7 @@ public class RallyController {
 				result = result + "    " + "- " + task.getId() + " - " + task.getName() + "\n" ;
 				
 				if (task.getNotes() != null && task.getNotes().length() > 0) {
-					result = result + "        " + ">> " + task.getNotes() + "\n";
+					result = result + "        " + ">> Notes :  " + task.getNotes() + "\n";
 				}
 			}
 			result = result + "\n";
