@@ -6,6 +6,7 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -174,7 +175,7 @@ public class RallyController {
 			List<Task> taskList = timeEntry.getTasks();
 			for (Iterator<Task> iterator2 = taskList.iterator(); iterator2.hasNext();) {
 				Task task = (Task) iterator2.next();
-				result = result + "    " + "- " + task.getId() + " - " + task.getName() + "\n" ;
+				result = result + "    " + "- " + task.getId() + " - " + task.getName() + " - " + task.getState() + "\n" ;
 				
 				if (task.getNotes() != null && task.getNotes().length() > 0) {
 					result = result + "        " + ">> Notes :  " + task.getNotes() + "\n";
@@ -237,6 +238,7 @@ public class RallyController {
 		QueryResponse timeQueryResponse = restApi.query(timeRequest);
 
 		JsonArray timeJsonArray = timeQueryResponse.getResults();
+		
 
 		if (timeJsonArray.size() == 0) {
 			return timeEntryList;
@@ -250,6 +252,7 @@ public class RallyController {
 	private List<TimeEntry> getTimeEntryBean(RallyRestApi restApi, JsonArray timeJsonArray,
 			String projectRef) throws Exception {
 		Map<String, List<Task>> timeMap = new HashMap<String, List<Task>>();
+		Set<String> objSet = new HashSet<String>();
 		for (int i = 0; i < timeJsonArray.size(); i++) {
 			JsonObject timeJsonObject = timeJsonArray.get(i).getAsJsonObject();
 			JsonObject itemJsonObject = timeJsonObject.get("TimeEntryItem").getAsJsonObject();
@@ -264,15 +267,22 @@ public class RallyController {
 					String user = itemJsonObject.get("User").getAsJsonObject().get("_refObjectName").toString();
 					user = user.replace("\"", "");
 					
+					
 					String taskObjId = taskObj.get("ObjectID").toString();
-					Task task = getTaskBean(restApi, taskObjId, projectRef);
-
-					List<Task> taksList = timeMap.get(user);
-					if (taksList == null) {
-						taksList = new ArrayList<Task>();
+					
+					
+					if (!objSet.contains(taskObjId)) {
+						System.out.println(taskName);
+						objSet.add(taskObjId);
+						Task task = getTaskBean(restApi, taskObjId, projectRef);
+	
+						List<Task> taksList = timeMap.get(user);
+						if (taksList == null) {
+							taksList = new ArrayList<Task>();
+						}
+						taksList.add(task);
+						timeMap.put(user, taksList);
 					}
-					taksList.add(task);
-					timeMap.put(user, taksList);
 				}
 
 			}
@@ -297,7 +307,7 @@ public class RallyController {
 
 		  QueryRequest taskRequest = new QueryRequest("Task");
 		  taskRequest.setProject(projectRef);
-		  taskRequest.setFetch(new Fetch(new String[] { "Name", "Notes", "FormattedID", "ObjectID" }));
+		  taskRequest.setFetch(new Fetch(new String[] { "Name", "Notes", "FormattedID", "ObjectID", "State" }));
 		  taskRequest.setQueryFilter(new QueryFilter("ObjectID", "=", taskObjId));
 		  
 		  QueryResponse taskQueryResponse = restApi.query(taskRequest);
@@ -310,12 +320,19 @@ public class RallyController {
 			  String taskName = taskJsonObject.get("Name").toString();
 			  String id = taskJsonObject.get("FormattedID").toString();
 			  String notes = taskJsonObject.get("Notes").toString();
+			  String state = taskJsonObject.get("State").toString();
 			  
 			  taskName = taskName.replace("\"", "");
 			  id = id.replace("\"", "");
 			  notes = notes.replace("\"", "");
+			  state = state.replace("\"", "");
 			  
-			  task = new Task(id, taskName, notes);
+			  
+			  notes = notes.replaceAll("\\<.*?\\>", "");
+			  notes = notes.replaceAll("&nbsp;", "");
+			  notes = notes.replaceAll("&amp;", "");
+			  
+			  task = new Task(id, taskName, notes, state);
 		  }
 		  
 		  return task;
@@ -410,11 +427,15 @@ public class RallyController {
 	private RallyRestApi getRallyRestApi() throws Exception {
 
 		URI server = new URI("https://rally1.rallydev.com");
-		return new RallyRestApi(server, apikey);
+		return new RallyRestApi(server, "_hTYpnS3FT5KuWDPiQb1kFdCDmOgaZ0JXmeYUSIZz6s");
 	}
 	
 	public static void main(String args[]) throws Exception {
+		RallyController r = new RallyController();
+		List<TimeEntry> timeEntryList =  r.processTimeEntry("Brainiacs", "2019-05-29");
+		String result = r.constructResultString("Brainiacs", "2019-05-29", timeEntryList);
 		
+		System.out.println(result);
 	}
 	
 }

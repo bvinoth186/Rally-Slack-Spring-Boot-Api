@@ -8,13 +8,15 @@ public class Task {
 	
 	private String notes;
 	
+	private String state;
 	
 
-	public Task(String id, String name, String notes) {
+	public Task(String id, String name, String notes, String state) {
 		super();
 		this.id = id;
 		this.name = name;
 		this.notes = notes;
+		this.state = state;
 	}
 
 	public String getName() {
@@ -40,6 +42,16 @@ public class Task {
 	public void setId(String id) {
 		this.id = id;
 	}
+
+	public String getState() {
+		return state;
+	}
+
+	public void setState(String state) {
+		this.state = state;
+	}
+	
+	
 	
 	
 
