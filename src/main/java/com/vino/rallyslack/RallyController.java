@@ -12,8 +12,12 @@ import java.util.Map;
 import java.util.Set;
 import java.util.StringTokenizer;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -21,6 +25,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.client.RestTemplate;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonNull;
@@ -50,6 +55,12 @@ public class RallyController {
 
 	@Value("${apikey}")
 	private String apikey;
+	
+	@Value("${slackWebHookUrl}")
+	private String slackWebHookUrl;
+	
+	@Autowired
+	private RestTemplate restTemplate;
 
 	@RequestMapping(value = "/ping", method = RequestMethod.GET)
 	public ResponseEntity<String> ping() {
@@ -98,6 +109,9 @@ public class RallyController {
 	@RequestMapping(value = "/timeentry", method = RequestMethod.POST )
 	public ResponseEntity<Slack> timeentryByPost(@RequestBody MultiValueMap<String, String> bodyMap) throws Exception {
 		System.out.println(bodyMap);
+		
+		logTransactionToSlack(bodyMap);
+		
 		List<String> inputList = bodyMap.get("text");
 		
 		String project = DEFAULT_PROJECT;
@@ -122,11 +136,34 @@ public class RallyController {
 		
 		List<TimeEntry> timeEntryList = processTimeEntry(project, date);
 		
-		result = "`" + project + " Staus Update - " + date + "`" + "\n" + "============================================================\n";
+		result = constructResultString(project, date, timeEntryList);
+		return new ResponseEntity<Slack>(new Slack(SLACK_RESPONSE_TYPE, result), HttpStatus.OK);
+	}
+
+	private void logTransactionToSlack(MultiValueMap<String, String> bodyMap) {
+		String transactionLog = "User Name = " + bodyMap.get("user_name") 
+										+ ", Channel Name = " + bodyMap.get("channel_name") 
+										+ ", Command = " + bodyMap.get("command") 
+										+ ", Arguments = " + bodyMap.get("text") ;
+		
+
+
+		HttpHeaders headers = new HttpHeaders();
+		headers.setContentType(MediaType.APPLICATION_JSON);
+		Map<String, String> map = new HashMap<String, String>();
+		map.put("text", transactionLog);
+		HttpEntity<Map<String, String>> request = new HttpEntity<Map<String, String>>(map, headers);
+		ResponseEntity<String> response = restTemplate.postForEntity( slackWebHookUrl, request , String.class );
+		System.out.println("logTransactionToSlack : " + response.getBody());
+	}
+
+	private String constructResultString(String project, String date, List<TimeEntry> timeEntryList) {
+		
+		String result = "`" + project + " Staus Update - " + date + "`" + "\n" + "===============================================================\n";
 		
 		if (timeEntryList == null || timeEntryList.isEmpty()) {
 			result = result +  "    " + "- " + "No Records Found";
-			return new ResponseEntity<Slack>(new Slack(SLACK_RESPONSE_TYPE, result), HttpStatus.OK);
+			return result;
 		}
 		
 		for (Iterator<TimeEntry> iterator = timeEntryList.iterator(); iterator.hasNext();) {
@@ -141,7 +178,7 @@ public class RallyController {
 			}
 			result = result + "\n";
 		}
-		return new ResponseEntity<Slack>(new Slack(SLACK_RESPONSE_TYPE, result), HttpStatus.OK);
+		return result;
 	}
 
 	private List<TimeEntry> processTimeEntry(String project, String date) throws Exception {
@@ -153,6 +190,7 @@ public class RallyController {
 		RallyRestApi restApi = null;
 		try {
 			restApi = getRallyRestApi();
+			System.out.println("Rally API " + restApi);
 
 			timeEntryList = getTimeEntries(restApi, date, project);
 
@@ -377,21 +415,32 @@ public class RallyController {
 		 */
 		
 		
-			String input = "Brainiacs,,2019,-05-29";
-			StringTokenizer token = new StringTokenizer(input, ",");
-			int count = token.countTokens();
-			System.out.println(count);
-			if (count == 2) {
-				System.out.println(token.nextElement().toString());
-				System.out.println(token.nextElement().toString());
-			} else if (count == 1) {
-				System.out.println(token.nextElement().toString());
-			} else {
-				System.out.println("error");
-			}
+		/*
+		 * String input = "Brainiacs,,2019,-05-29"; StringTokenizer token = new
+		 * StringTokenizer(input, ","); int count = token.countTokens();
+		 * System.out.println(count); if (count == 2) {
+		 * System.out.println(token.nextElement().toString());
+		 * System.out.println(token.nextElement().toString()); } else if (count == 1) {
+		 * System.out.println(token.nextElement().toString()); } else {
+		 * System.out.println("error"); }
+		 */
+		
+		String slackWebHookUrl = "https://hooks.slack.com/services/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";
+		
+		HttpHeaders headers = new HttpHeaders();
+		headers.setContentType(MediaType.APPLICATION_JSON);
+
+		Map<String, String> map = new HashMap<String, String>();
+		map.put("text", "hello");
+
+		HttpEntity<Map<String, String>> request = new HttpEntity<Map<String, String>>(map, headers);
+
+		RestTemplate restTemplate = new RestTemplate();
+		ResponseEntity<String> response = restTemplate.postForEntity( slackWebHookUrl, request , String.class );
+		System.out.println(response.getBody());
 		
 		
 		
 	}
-
+	
 }
