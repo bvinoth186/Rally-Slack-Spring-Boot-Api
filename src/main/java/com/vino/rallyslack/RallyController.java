@@ -174,10 +174,10 @@ public class RallyController {
 			List<Task> taskList = timeEntry.getTasks();
 			for (Iterator<Task> iterator2 = taskList.iterator(); iterator2.hasNext();) {
 				Task task = (Task) iterator2.next();
-				result = result + "    " + "- " + task.getId() + " " + task.getName();
+				result = result + "    " + "- " + task.getId() + " - " + task.getName() + "\n" ;
 				
 				if (task.getNotes() != null && task.getNotes().length() > 0) {
-					result = result + "\n" + "        " + "- " + task.getNotes();
+					result = result + "\n" + "        " + "- " + task.getNotes() + "\n";
 				}
 			}
 			result = result + "\n";
