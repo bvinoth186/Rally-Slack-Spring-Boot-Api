@@ -179,7 +179,6 @@ public class RallyController {
 				if (task.getNotes() != null && task.getNotes().length() > 0) {
 					result = result + "        " + ">> " + task.getNotes() + "\n";
 				}
-				result = result + "\n";
 			}
 			result = result + "\n";
 		}
