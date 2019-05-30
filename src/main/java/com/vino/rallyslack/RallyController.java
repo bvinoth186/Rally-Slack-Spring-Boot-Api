@@ -169,7 +169,7 @@ public class RallyController {
 		for (Iterator<TimeEntry> iterator = timeEntryList.iterator(); iterator.hasNext();) {
 			TimeEntry timeEntry = (TimeEntry) iterator.next();
 			
-			result = result + timeEntry.getName() + "\n\n";
+			result = result + "`" + timeEntry.getName() + "`" + "\n\n";
 			
 			List<Task> taskList = timeEntry.getTasks();
 			for (Iterator<Task> iterator2 = taskList.iterator(); iterator2.hasNext();) {
