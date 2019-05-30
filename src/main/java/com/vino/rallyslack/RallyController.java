@@ -171,10 +171,14 @@ public class RallyController {
 			
 			result = result + timeEntry.getName() + "\n";
 			
-			List<String> taskList = timeEntry.getTasks();
-			for (Iterator<String> iterator2 = taskList.iterator(); iterator2.hasNext();) {
-				String task = (String) iterator2.next();
-				result = result + "    " + "- " + task + "\n";
+			List<Task> taskList = timeEntry.getTasks();
+			for (Iterator<Task> iterator2 = taskList.iterator(); iterator2.hasNext();) {
+				Task task = (Task) iterator2.next();
+				result = result + "    " + "- " + task.getId() + " " + task.getName();
+				
+				if (task.getNotes() != null && task.getNotes().length() > 0) {
+					result = result + "\n" + "        " + "- " + task.getNotes();
+				}
 			}
 			result = result + "\n";
 		}
@@ -224,7 +228,7 @@ public class RallyController {
 
 		QueryRequest timeRequest = new QueryRequest("TimeEntryValue");
 		timeRequest.setQueryFilter(queryFilter);
-		timeRequest.setFetch(new Fetch(new String[] { "Task", "Hours", "TimeEntryItem", "User", "DateVal" }));
+		timeRequest.setFetch(new Fetch(new String[] { "Task", "Hours", "TimeEntryItem", "User", "DateVal", "ObjectID", "Name" }));
 		timeRequest.setProject(projectRef);
 		timeRequest.setLimit(25000);
 		timeRequest.setScopedDown(false);
@@ -238,30 +242,36 @@ public class RallyController {
 			return timeEntryList;
 		}
 
-		timeEntryList = getTimeEntryBean(timeJsonArray);
+		timeEntryList = getTimeEntryBean(restApi, timeJsonArray, projectRef);
 
 		return timeEntryList;
 	}
 
-	private List<TimeEntry> getTimeEntryBean(JsonArray timeJsonArray) {
-		Map<String, List<String>> timeMap = new HashMap<String, List<String>>();
+	private List<TimeEntry> getTimeEntryBean(RallyRestApi restApi, JsonArray timeJsonArray,
+			String projectRef) throws Exception {
+		Map<String, List<Task>> timeMap = new HashMap<String, List<Task>>();
 		for (int i = 0; i < timeJsonArray.size(); i++) {
 			JsonObject timeJsonObject = timeJsonArray.get(i).getAsJsonObject();
 			JsonObject itemJsonObject = timeJsonObject.get("TimeEntryItem").getAsJsonObject();
 
 			if (itemJsonObject.get("Task") != JsonNull.INSTANCE) {
-				String taskName = itemJsonObject.get("Task").getAsJsonObject().get("_refObjectName").toString();
+				
+				JsonObject taskObj = itemJsonObject.get("Task").getAsJsonObject();
+				String taskName = taskObj.get("Name").toString();
 				taskName = taskName.replace("\"", "");
 
 				if (!taskName.toUpperCase().contains("Project Meetings".toUpperCase())) {
 					String user = itemJsonObject.get("User").getAsJsonObject().get("_refObjectName").toString();
 					user = user.replace("\"", "");
+					
+					String taskObjId = taskObj.get("ObjectID").toString();
+					Task task = getTaskBean(restApi, taskObjId, projectRef);
 
-					List<String> taksList = timeMap.get(user);
+					List<Task> taksList = timeMap.get(user);
 					if (taksList == null) {
-						taksList = new ArrayList<String>();
+						taksList = new ArrayList<Task>();
 					}
-					taksList.add(taskName);
+					taksList.add(task);
 					timeMap.put(user, taksList);
 				}
 
@@ -281,6 +291,34 @@ public class RallyController {
 		}
 
 		return timeEntryList;
+	}
+
+	private Task getTaskBean(RallyRestApi restApi, String taskObjId, String projectRef) throws Exception {
+
+		  QueryRequest taskRequest = new QueryRequest("Task");
+		  taskRequest.setProject(projectRef);
+		  taskRequest.setFetch(new Fetch(new String[] { "Name", "Notes", "FormattedID", "ObjectID" }));
+		  taskRequest.setQueryFilter(new QueryFilter("ObjectID", "=", taskObjId));
+		  
+		  QueryResponse taskQueryResponse = restApi.query(taskRequest);
+		  
+		  JsonArray taskJsonArray = taskQueryResponse.getResults();
+		  Task task = null;
+		  if (taskJsonArray.size() != 0) {
+			  JsonObject taskJsonObject = taskJsonArray.get(0).getAsJsonObject();
+			  
+			  String taskName = taskJsonObject.get("Name").toString();
+			  String id = taskJsonObject.get("FormattedID").toString();
+			  String notes = taskJsonObject.get("Notes").toString();
+			  
+			  taskName = taskName.replace("\"", "");
+			  id = id.replace("\"", "");
+			  notes = notes.replace("\"", "");
+			  
+			  task = new Task(id, taskName, notes);
+		  }
+		  
+		  return task;
 	}
 
 	private QueryFilter getQueryFilterStringByDate(String inputDateStr) {
@@ -376,70 +414,6 @@ public class RallyController {
 	}
 	
 	public static void main(String args[]) throws Exception {
-		
-		RallyController rallyController = new RallyController(); 
-//		System.out.println(rallyController.getTodaysDate());
-		/*
-		 * String project = "Brainiacs";
-		 * 
-		 * String date = "2019-05-29";
-		 * 
-		 * RallyController rallyController = new RallyController(); List<TimeEntry>
-		 * timeEntryList = rallyController.processTimeEntry(project, date); HttpStatus
-		 * status = rallyController.getHttpStatusCode(timeEntryList); Rally rally =
-		 * rallyController.getRallyResponse(timeEntryList, status);
-		 * 
-		 * 
-		 * 
-		 * String result = "`" + project + " Staus Update - " + date + "`" + "\n";
-		 * 
-		 * if (timeEntryList == null || timeEntryList.isEmpty()) { result = result +
-		 * "    " + "- " + "No Records Found"; } for (Iterator iterator =
-		 * timeEntryList.iterator(); iterator.hasNext();) { TimeEntry timeEntry =
-		 * (TimeEntry) iterator.next();
-		 * 
-		 * result = result + timeEntry.getName() + "\n";
-		 * 
-		 * List<String> taskList = timeEntry.getTasks(); for (Iterator iterator2 =
-		 * taskList.iterator(); iterator2.hasNext();) { String task = (String)
-		 * iterator2.next(); result = result + "    " + "- " + task + "\n"; } }
-		 */
-		
-		/*
-		 * String input = "Brainiacs2019-05-29::"; StringTokenizer token = new
-		 * StringTokenizer(input, "::"); if (token.countTokens() == 2) {
-		 * System.out.println(token.nextElement().toString());
-		 * System.out.println(token.nextElement().toString()); } else if
-		 * (token.countTokens() == 1) { System.out.println(input); } else {
-		 * System.out.println("error"); }
-		 */
-		
-		
-		/*
-		 * String input = "Brainiacs,,2019,-05-29"; StringTokenizer token = new
-		 * StringTokenizer(input, ","); int count = token.countTokens();
-		 * System.out.println(count); if (count == 2) {
-		 * System.out.println(token.nextElement().toString());
-		 * System.out.println(token.nextElement().toString()); } else if (count == 1) {
-		 * System.out.println(token.nextElement().toString()); } else {
-		 * System.out.println("error"); }
-		 */
-		
-		String slackWebHookUrl = "https://hooks.slack.com/services/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";
-		
-		HttpHeaders headers = new HttpHeaders();
-		headers.setContentType(MediaType.APPLICATION_JSON);
-
-		Map<String, String> map = new HashMap<String, String>();
-		map.put("text", "hello");
-
-		HttpEntity<Map<String, String>> request = new HttpEntity<Map<String, String>>(map, headers);
-
-		RestTemplate restTemplate = new RestTemplate();
-		ResponseEntity<String> response = restTemplate.postForEntity( slackWebHookUrl, request , String.class );
-		System.out.println(response.getBody());
-		
-		
 		
 	}
 	

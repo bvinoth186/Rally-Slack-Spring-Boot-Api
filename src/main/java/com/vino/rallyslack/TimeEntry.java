@@ -6,7 +6,7 @@ public class TimeEntry {
 	
 	private String name; 
 	
-	private List<String> tasks;
+	private List<Task> tasks;
 
 	public String getName() {
 		return name;
@@ -16,11 +16,11 @@ public class TimeEntry {
 		this.name = name;
 	}
 
-	public List<String> getTasks() {
+	public List<Task> getTasks() {
 		return tasks;
 	}
 
-	public void setTasks(List<String> tasks) {
+	public void setTasks(List<Task> tasks) {
 		this.tasks = tasks;
 	}
 	
