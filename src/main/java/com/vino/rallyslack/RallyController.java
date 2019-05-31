@@ -427,7 +427,7 @@ public class RallyController {
 	private RallyRestApi getRallyRestApi() throws Exception {
 
 		URI server = new URI("https://rally1.rallydev.com");
-		return new RallyRestApi(server, "_hTYpnS3FT5KuWDPiQb1kFdCDmOgaZ0JXmeYUSIZz6s");
+		return new RallyRestApi(server, apikey);
 	}
 	
 	public static void main(String args[]) throws Exception {
