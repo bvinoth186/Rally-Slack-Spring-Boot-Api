@@ -2,10 +2,11 @@ package com.vino.rallyslack;
 
 import java.io.IOException;
 import java.net.URI;
+import java.text.SimpleDateFormat;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
-import java.util.Date;
+import java.util.Calendar;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -13,6 +14,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.StringTokenizer;
+import java.util.TimeZone;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -50,6 +52,8 @@ public class RallyController {
 	private String SLACK_RESPONSE_TYPE = "in_channel";
 	
 	private DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+	
+	private SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss z");
 
 	@Value("${apikey}")
 	private String apikey;
@@ -102,7 +106,7 @@ public class RallyController {
 		
 		String endpoint = getSlackWebHookUrl(project);
 		if (endpoint != null) {
-			String results = "[Auto triggered on " + new Date() + "] \n\n" + responseEntity.getBody().getText();
+			String results = "[Auto triggered on " + getCentralTime() + "] \n\n" + responseEntity.getBody().getText();
 			ResponseEntity<String> response = post(endpoint, results);
 			
 			System.out.println("published to Slack : " + response.getBody() + " for the project " + project);
@@ -424,6 +428,23 @@ public class RallyController {
 		return new RallyRestApi(server, apikey);
 	}
 	
+	private String getCentralTime() {
+		
+		Calendar cal = Calendar.getInstance();
+		TimeZone timeZone = TimeZone.getTimeZone("GMT");
+        cal.setTimeZone(timeZone);
+        
+        sdf.setTimeZone(timeZone);
+        String gmtDateStr = sdf.format(cal.getTime());
+        
+        // To CST
+        TimeZone cst = TimeZone.getTimeZone("CST");
+        sdf.setTimeZone(cst);
+        
+        return sdf.format(cal.getTime());
+
+	}
+	
 	public static void main(String args[]) throws Exception {
 		/**RallyController r = new RallyController();
 		List<TimeEntry> timeEntryList =  r.process("Brainiacs", "2019-05-29");
@@ -431,7 +452,24 @@ public class RallyController {
 		
 		System.out.println(result);*/
 		
-		System.out.println(getUsage());
+//		System.out.println(getUsage());
+		
+		
+		Calendar cal = Calendar.getInstance();
+		TimeZone timeZone = TimeZone.getTimeZone("GMT");
+        cal.setTimeZone(timeZone);
+        
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss z");
+        sdf.setTimeZone(timeZone);
+        String gmtDateStr = sdf.format(cal.getTime());
+        System.out.println("Formatted GMT time = " + gmtDateStr);
+
+        // To CST
+        TimeZone cst = TimeZone.getTimeZone("CST");
+        sdf.setTimeZone(cst);
+
+        System.out.println("FORMATTED CST DATE = " + sdf.format(cal.getTime()));
+	    
 	}
 	
 }
