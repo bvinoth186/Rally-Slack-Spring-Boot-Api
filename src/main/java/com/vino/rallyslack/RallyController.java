@@ -15,6 +15,7 @@ import java.util.StringTokenizer;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.env.Environment;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -24,7 +25,6 @@ import org.springframework.util.MultiValueMap;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.client.RestTemplate;
 
@@ -43,12 +43,8 @@ public class RallyController {
 	private String NO_DATA_FOUND = "No Data Found";
 
 	private String SUCCESS = "Success";
-
-	private String ERROR = "Internal Server Error";
 	
-	private String DEFAULT_PROJECT = "Brainiacs";
-	
-	private String INVALID_USAGE = "Invalid Usage, use /fly-rally-timesheet {Rally Project Name},{Date in YYYY-MM-dd format} Eg: /fly-rally-timesheet Brainiacs,2019-05-29";
+	private String DEFAULT_PROJECT = "";
 	
 	private String SLACK_RESPONSE_TYPE = "in_channel";
 	
@@ -57,122 +53,162 @@ public class RallyController {
 	@Value("${apikey}")
 	private String apikey;
 	
-	@Value("${slackWebHookUrl}")
-	private String slackWebHookUrl;
+	@Value("${slack-channel-transaction}")
+	private String slackChTransaction;
+	
+	@Autowired
+	private Environment env;
 	
 	@Autowired
 	private RestTemplate restTemplate;
 
 	@RequestMapping(value = "/ping", method = RequestMethod.GET)
 	public ResponseEntity<String> ping() {
-		return new ResponseEntity<>("Success", HttpStatus.OK);
-	}
-
-	@RequestMapping(value = "/timeentry", params = { "!date" }, method = RequestMethod.GET)
-	public ResponseEntity<Rally> timeentryByProject(@RequestParam("project") String project) throws Exception {
-
-		List<TimeEntry> timeEntryList = processTimeEntry(project, null);
-		HttpStatus status = getHttpStatusCode(timeEntryList);
-		Rally rally = getRallyResponse(timeEntryList, status);
-		return new ResponseEntity<Rally>(rally, status);
-	}
-
-	@RequestMapping(value = "/timeentry", params = { "!project" }, method = RequestMethod.GET)
-	public ResponseEntity<Rally> timeentryByDate(@RequestParam("date") String date) throws Exception {
-
-		List<TimeEntry> timeEntryList = processTimeEntry(null, date);
-		HttpStatus status = getHttpStatusCode(timeEntryList);
-		Rally rally = getRallyResponse(timeEntryList, status);
-		return new ResponseEntity<Rally>(rally, status);
+		return new ResponseEntity<>(SUCCESS, HttpStatus.OK);
 	}
 	
-	
-
-	@RequestMapping(value = "/timeentry", params = { "project", "date" }, method = RequestMethod.GET)
-	public ResponseEntity<Rally> timeentryByProjectAndDate(@RequestParam("project") String project,
-			@RequestParam("date") String date) throws Exception {
-
-		List<TimeEntry> timeEntryList = processTimeEntry(project, date);
-		HttpStatus status = getHttpStatusCode(timeEntryList);
-		Rally rally = getRallyResponse(timeEntryList, status);
-		return new ResponseEntity<Rally>(rally, status);
+	public static String getUsage() {
+		
+		String usage = "Slack application to intract with Rally. It returns the timesheet data for the given project and date\n\n";
+		usage = usage + "USAGE:  ";
+		usage = usage + "   /fly-rally-timesheet project-name[,date] \n\n";
+		usage = usage + "   --> project-name - Name of the Rally Project (required) \n";
+		usage = usage + "   --> date         - date in YYYY-MM-dd format (optional) \n";
+		usage = usage + "   --> if the date is not provided, timesheet details of current day would be returned \n";
+		usage = usage + "   --> project-name and date is seperated by comma ',' \n\n";
+		usage = usage + "EXAMPLE: \n\n";
+		usage = usage + "   /fly-rally-timesheet Brainiacs \n";
+		usage = usage + "   /fly-rally-timesheet Brainiacs,2019-05-31\n";
+				
+				
+			
+		return usage;
 	}
 
-	@RequestMapping(value = "/timeentry", params = { "!project", "!date" }, method = RequestMethod.GET)
-	public ResponseEntity<Rally> timeentry() throws Exception {
-
-		List<TimeEntry> timeEntryList = processTimeEntry(null, null);
-		HttpStatus status = getHttpStatusCode(timeEntryList);
-		Rally rally = getRallyResponse(timeEntryList, status);
-		return new ResponseEntity<Rally>(rally, status);
+	
+	@RequestMapping(value = "/publish", method = RequestMethod.POST )
+	public ResponseEntity<Slack> publishToSlack(@RequestBody MultiValueMap<String, String> bodyMap) throws Exception {
+		
+		List<String> inputList  = parseInputArgument(bodyMap);
+		if (inputList == null) {
+			return new ResponseEntity<Slack>(new Slack(SLACK_RESPONSE_TYPE, getUsage()), HttpStatus.OK);
+		}
+		
+		String project = inputList.get(0);
+		ResponseEntity<Slack> responseEntity = timeentry(bodyMap);
+		
+		String endpoint = getSlackWebHookUrl(project);
+		if (endpoint != null) {
+			ResponseEntity<String> response = post(endpoint, responseEntity.getBody().getText());
+			System.out.println("published to Slack : " + response.getBody());
+		} else {
+			System.out.println("Webhook URL is not defined for " + project);
+		}
+		
+		return responseEntity;
+		
 	}
 	
+	private String getSlackWebHookUrl(String project) {
+		return env.getProperty(project);
+	}
+
+
 	@RequestMapping(value = "/timeentry", method = RequestMethod.POST )
-	public ResponseEntity<Slack> timeentryByPost(@RequestBody MultiValueMap<String, String> bodyMap) throws Exception {
+	public ResponseEntity<Slack> timeentry(@RequestBody MultiValueMap<String, String> bodyMap) throws Exception {
+		
 		System.out.println(bodyMap);
+		logTransactionIntoSlack(bodyMap);
 		
-		logTransactionToSlack(bodyMap);
+		List<String> inputList  = parseInputArgument(bodyMap);
+		if (inputList == null) {
+			return new ResponseEntity<Slack>(new Slack(SLACK_RESPONSE_TYPE, getUsage()), HttpStatus.OK);
+		}
 		
-		List<String> inputList = bodyMap.get("text");
+		String project = inputList.get(0);
+		String date = inputList.get(1);
+		Map<String, List<Task>>  timeMap = process(project, date);
+		String result = constructResultString(project, date, timeMap);
 		
+		System.out.println("Timesheet data fetched for " + timeMap.size() + " users");
+		return new ResponseEntity<Slack>(new Slack(SLACK_RESPONSE_TYPE, result), HttpStatus.OK);
+	}
+	
+	private List<String> parseInputArgument(MultiValueMap<String, String> bodyMap) {
+		
+		
+		
+		List<String> textList = bodyMap.get("text");
 		String project = DEFAULT_PROJECT;
 		String date = getTodaysDate();
-	
-		String result = "";
-		if (inputList != null && !inputList.isEmpty()) {
-			String input = inputList.get(0);
-			if (input != null && input.length() > 0) {
-				StringTokenizer token = new StringTokenizer(input, ",");
+		
+		if (textList != null && !textList.isEmpty()) {
+			String text = textList.get(0);
+			if (text != null && text.length() > 0) {
+				StringTokenizer token = new StringTokenizer(text, ",");
 				if (token.countTokens() == 2) {
 					project = token.nextElement().toString();
 					date = token.nextElement().toString();
 				} else if (token.countTokens() == 1) {
-					project = input;
+					project = text;
 				} else {
-					result = INVALID_USAGE;
-					return new ResponseEntity<Slack>(new Slack(SLACK_RESPONSE_TYPE, result), HttpStatus.OK);
+					return null;
+					
 				}
+			} else {
+				return null;
 			}
+		} else {
+			return null;
 		}
 		
-		List<TimeEntry> timeEntryList = processTimeEntry(project, date);
+		List<String> inputList  = new ArrayList<String>();
+		inputList.add(project);
+		inputList.add(date);
 		
-		result = constructResultString(project, date, timeEntryList);
-		return new ResponseEntity<Slack>(new Slack(SLACK_RESPONSE_TYPE, result), HttpStatus.OK);
+		return inputList;
 	}
 
-	private void logTransactionToSlack(MultiValueMap<String, String> bodyMap) {
+	private void logTransactionIntoSlack(MultiValueMap<String, String> bodyMap) {
 		String transactionLog = "User Name = " + bodyMap.get("user_name") 
 										+ ", Channel Name = " + bodyMap.get("channel_name") 
 										+ ", Command = " + bodyMap.get("command") 
 										+ ", Arguments = " + bodyMap.get("text") ;
 		
 
-
-		HttpHeaders headers = new HttpHeaders();
-		headers.setContentType(MediaType.APPLICATION_JSON);
-		Map<String, String> map = new HashMap<String, String>();
-		map.put("text", transactionLog);
-		HttpEntity<Map<String, String>> request = new HttpEntity<Map<String, String>>(map, headers);
-		ResponseEntity<String> response = restTemplate.postForEntity( slackWebHookUrl, request , String.class );
+		ResponseEntity<String> response = post(slackChTransaction, transactionLog);
 		System.out.println("logTransactionToSlack : " + response.getBody());
 	}
 
-	private String constructResultString(String project, String date, List<TimeEntry> timeEntryList) {
+
+
+	private ResponseEntity<String> post(String endpoint, String text) {
+		HttpHeaders headers = new HttpHeaders();
+		headers.setContentType(MediaType.APPLICATION_JSON);
+		Map<String, String> map = new HashMap<String, String>();
+		map.put("text", text);
+		HttpEntity<Map<String, String>> request = new HttpEntity<Map<String, String>>(map, headers);
+		ResponseEntity<String> response = restTemplate.postForEntity(endpoint, request , String.class );
+		
+		return response;
+	}
+
+	private String constructResultString(String project, String date, Map<String, List<Task>>  timeMap) {
 		
 		String result = "`" + project + " Staus Update - " + date + "`" + "\n" + "===============================================================\n";
 		
-		if (timeEntryList == null || timeEntryList.isEmpty()) {
-			result = result +  "    " + "- " + "No Records Found";
+		if (timeMap == null || timeMap.isEmpty()) {
+			result = result +  "    " + "- " + NO_DATA_FOUND;
 			return result;
 		}
 		
-		for (Iterator<TimeEntry> iterator = timeEntryList.iterator(); iterator.hasNext();) {
-			TimeEntry timeEntry = (TimeEntry) iterator.next();
+		Set<String> userSet = timeMap.keySet();
+		for (Iterator <String> iterator = userSet.iterator(); iterator.hasNext();) {
+			String userName = iterator.next();
 			
-			result = result + "`" + timeEntry.getName() + "`" + "\n\n";
+			result = result + "`" + userName + "`" + "\n\n";
 			
-			List<Task> taskList = timeEntry.getTasks();
+			List<Task> taskList = timeMap.get(userName);
 			for (Iterator<Task> iterator2 = taskList.iterator(); iterator2.hasNext();) {
 				Task task = (Task) iterator2.next();
 				result = result + "    " + "- " + task.getId() + " - " + task.getName() + " - " + task.getState() + "\n" ;
@@ -186,45 +222,44 @@ public class RallyController {
 		return result;
 	}
 
-	private List<TimeEntry> processTimeEntry(String project, String date) throws Exception {
+	private Map<String, List<Task>> process(String project, String date) throws Exception {
 
-		System.out.println("Input Project : " + project + ", Input Date " + date);
-		List<TimeEntry> timeEntryList = null;
+		System.out.println("Project : " + project + ", Input Date " + date);
+		Map<String, List<Task>> timeMap = null;
 		
-
 		RallyRestApi restApi = null;
 		try {
 			restApi = getRallyRestApi();
 			System.out.println("Rally API " + restApi);
 
-			timeEntryList = getTimeEntries(restApi, date, project);
+			timeMap = getTimeEntries(restApi, project, date);
 
 		} catch (Exception e) {
 			e.printStackTrace();
-			timeEntryList = null;
+			timeMap = null;
 		} finally {
 			if (restApi != null) {
 				restApi.close();
 			}
 		}
-		return timeEntryList;
+		return timeMap;
 	}
 
-	private List<TimeEntry> getTimeEntries(RallyRestApi restApi, String inputDateStr, String projectName)
+	private Map<String, List<Task>> getTimeEntries(RallyRestApi restApi, String projectName, String date)
 			throws Exception {
 
-		List<TimeEntry> timeEntryList = new ArrayList<TimeEntry>();
+		Map<String, List<Task>> timeMap = new HashMap<String, List<Task>>();
+		
 		String projectRef = getProjectRefByName(restApi, projectName);
-
 		System.out.println("projectRef : " + projectRef);
 		if (projectRef == null) {
-			return timeEntryList;
+			return timeMap;
 		}
-		QueryFilter queryFilter = getQueryFilterStringByDate(inputDateStr);
-		System.out.println("queryFilter : " + queryFilter);
 		
+		QueryFilter queryFilter = getQueryFilterStringByDate(date);
+		System.out.println("queryFilter : " + queryFilter);
 		if (queryFilter == null) {
-			return timeEntryList;
+			return timeMap;
 		}
 
 		QueryRequest timeRequest = new QueryRequest("TimeEntryValue");
@@ -236,21 +271,19 @@ public class RallyController {
 		timeRequest.setScopedUp(false);
 
 		QueryResponse timeQueryResponse = restApi.query(timeRequest);
-
 		JsonArray timeJsonArray = timeQueryResponse.getResults();
-		
-
 		if (timeJsonArray.size() == 0) {
-			return timeEntryList;
+			return timeMap;
 		}
 
-		timeEntryList = getTimeEntryBean(restApi, timeJsonArray, projectRef);
+		timeMap  = getTimeEntryMap(restApi, timeJsonArray, projectRef);
 
-		return timeEntryList;
+		return timeMap;
 	}
 
-	private List<TimeEntry> getTimeEntryBean(RallyRestApi restApi, JsonArray timeJsonArray,
+	private Map<String, List<Task>>  getTimeEntryMap(RallyRestApi restApi, JsonArray timeJsonArray,
 			String projectRef) throws Exception {
+		
 		Map<String, List<Task>> timeMap = new HashMap<String, List<Task>>();
 		Set<String> objSet = new HashSet<String>();
 		for (int i = 0; i < timeJsonArray.size(); i++) {
@@ -267,12 +300,8 @@ public class RallyController {
 					String user = itemJsonObject.get("User").getAsJsonObject().get("_refObjectName").toString();
 					user = user.replace("\"", "");
 					
-					
 					String taskObjId = taskObj.get("ObjectID").toString();
-					
-					
 					if (!objSet.contains(taskObjId)) {
-						System.out.println(taskName);
 						objSet.add(taskObjId);
 						Task task = getTaskBean(restApi, taskObjId, projectRef);
 	
@@ -288,19 +317,7 @@ public class RallyController {
 			}
 		}
 
-		Set<String> userSet = timeMap.keySet();
-		List<TimeEntry> timeEntryList = new ArrayList<TimeEntry>();
-		for (Iterator<String> iterator = userSet.iterator(); iterator.hasNext();) {
-			String user = (String) iterator.next();
-			TimeEntry timeEntry = new TimeEntry();
-			timeEntry.setName(user);
-			timeEntry.setTasks(timeMap.get(user));
-
-			timeEntryList.add(timeEntry);
-
-		}
-
-		return timeEntryList;
+		return timeMap;
 	}
 
 	private Task getTaskBean(RallyRestApi restApi, String taskObjId, String projectRef) throws Exception {
@@ -388,8 +405,6 @@ public class RallyController {
 		String projectRef = null;
 		if (storyQueryResponse.getTotalResultCount() > 0) {
 			projectRef = "project/" + storyQueryResponse.getResults().get(0).getAsJsonObject().get("ObjectID");
-			System.out
-					.println("Project Name : " + storyQueryResponse.getResults().get(0).getAsJsonObject().get("Name"));
 		}
 
 		return projectRef;
@@ -397,32 +412,6 @@ public class RallyController {
 
 	
 
-	private Rally getRallyResponse(List<TimeEntry> timeEntryList, HttpStatus status) {
-
-		String message = SUCCESS;
-		if (status == HttpStatus.NOT_FOUND) {
-			message = NO_DATA_FOUND;
-		} else if (status == HttpStatus.INTERNAL_SERVER_ERROR) {
-			message = ERROR;
-		}
-
-		Rally rally = new Rally();
-		rally.setTimeSheetEntries(timeEntryList);
-		rally.setMessage(message);
-		return rally;
-	}
-
-	private HttpStatus getHttpStatusCode(List<TimeEntry> timeEntryList) {
-
-		HttpStatus status = HttpStatus.OK;
-		if (timeEntryList == null) {
-			status = HttpStatus.INTERNAL_SERVER_ERROR;
-		} else if (timeEntryList.isEmpty()) {
-			status = HttpStatus.NOT_FOUND;
-		}
-
-		return status;
-	}
 	
 	private RallyRestApi getRallyRestApi() throws Exception {
 
@@ -431,11 +420,13 @@ public class RallyController {
 	}
 	
 	public static void main(String args[]) throws Exception {
-		RallyController r = new RallyController();
-		List<TimeEntry> timeEntryList =  r.processTimeEntry("Brainiacs", "2019-05-29");
+		/**RallyController r = new RallyController();
+		List<TimeEntry> timeEntryList =  r.process("Brainiacs", "2019-05-29");
 		String result = r.constructResultString("Brainiacs", "2019-05-29", timeEntryList);
 		
-		System.out.println(result);
+		System.out.println(result);*/
+		
+		System.out.println(getUsage());
 	}
 	
 }
