@@ -5,6 +5,7 @@ import java.net.URI;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -101,8 +102,10 @@ public class RallyController {
 		
 		String endpoint = getSlackWebHookUrl(project);
 		if (endpoint != null) {
-			ResponseEntity<String> response = post(endpoint, responseEntity.getBody().getText());
-			System.out.println("published to Slack : " + response.getBody());
+			String results = "[Auto triggered on " + new Date() + "] \n\n" + responseEntity.getBody().getText();
+			ResponseEntity<String> response = post(endpoint, results);
+			
+			System.out.println("published to Slack : " + response.getBody() + " for the project " + project);
 		} else {
 			System.out.println("Webhook URL is not defined for " + project);
 		}
