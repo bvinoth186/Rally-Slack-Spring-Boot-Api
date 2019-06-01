@@ -69,14 +69,16 @@ public class RallyController {
 	
 	public static String getUsage() {
 		
-		String usage = "Slack application to intract with Rally. It returns the timesheet data for the given project and date\n\n";
-		usage = usage + "USAGE:  ";
-		usage = usage + "   /fly-rally-timesheet project-name[,date] \n\n";
+		String usage = "Slack application intracts with Rally and returns the timesheet data for the given project and date\n\n";
+		usage = usage + "`USAGE: `\n\n";
+		usage = usage + "   \t/fly-rally-timesheet project-name[,date] \n\n";
 		usage = usage + "   --> project-name - Name of the Rally Project (required) \n";
-		usage = usage + "   --> date         - date in YYYY-MM-dd format (optional) \n";
+		usage = usage + "   --> date         - Date in which timesheet details required (optional) \n\n";
+		usage = usage + "   --> project-name shoufd match with Rally \n";
 		usage = usage + "   --> if the date is not provided, timesheet details of current day would be returned \n";
+		usage = usage + "   --> date should be in  YYYY-MM-dd format (optional) \n";
 		usage = usage + "   --> project-name and date is seperated by comma ',' \n\n";
-		usage = usage + "EXAMPLE: \n\n";
+		usage = usage + "`EXAMPLE: `\n\n";
 		usage = usage + "   /fly-rally-timesheet Brainiacs \n";
 		usage = usage + "   /fly-rally-timesheet Brainiacs,2019-05-31\n";
 				
