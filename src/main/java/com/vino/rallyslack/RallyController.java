@@ -99,7 +99,8 @@ public class RallyController {
 		return usage;
 	}
 	
-	@Scheduled(cron = "0 52 10 * * *")
+	
+	@Scheduled(cron = "0 15 13 * * *") //8.15 AM CST
 	public void schedule() throws Exception {
 		System.out.println(new Date());
 		publishToSlack("Brainiacs");
@@ -107,12 +108,16 @@ public class RallyController {
 	
 	private void publishToSlack(String projectName) throws Exception {
 		
-		LOGGER.info("Rally timesheets for " + projectName + "Scheduled at" + new Date());
+		LOGGER.info("Rally timesheets for " + projectName + " Scheduled at" + new Date());
 		
 		MultiValueMap<String, String> bodyMap = new LinkedMultiValueMap<String, String>();
 		List<String> inputList = new ArrayList<String>();
 		inputList.add(projectName);
 		bodyMap.put("text", inputList);
+		
+		List<String> nameList = new ArrayList<String>();
+		nameList.add("rally-scheduler");
+		bodyMap.put("user_name", nameList);
 		
 		ResponseEntity<Slack> responseEntity = timeentry(bodyMap);
 		
