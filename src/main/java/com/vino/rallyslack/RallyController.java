@@ -99,8 +99,9 @@ public class RallyController {
 		return usage;
 	}
 	
-	@Scheduled(cron = "26 10 * * * *")
+	@Scheduled(cron = "0 52 10 * * *")
 	public void schedule() throws Exception {
+		System.out.println(new Date());
 		publishToSlack("Brainiacs");
 	}
 	
