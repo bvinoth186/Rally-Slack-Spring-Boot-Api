@@ -99,43 +99,32 @@ public class RallyController {
 		return usage;
 	}
 	
-	@Scheduled(cron = "11 10 * * * *")
+	@Scheduled(cron = "26 10 * * * *")
 	public void schedule() throws Exception {
-		LOGGER.info("Scheduled at" + new Date());
-	   
+		publishToSlack("Brainiacs");
+	}
+	
+	private void publishToSlack(String projectName) throws Exception {
+		
+		LOGGER.info("Rally timesheets for " + projectName + "Scheduled at" + new Date());
+		
 		MultiValueMap<String, String> bodyMap = new LinkedMultiValueMap<String, String>();
 		List<String> inputList = new ArrayList<String>();
-		inputList.add("Brainiacs");
+		inputList.add(projectName);
 		bodyMap.put("text", inputList);
 		
-		ResponseEntity<Slack> responseEntity = publishToSlack(bodyMap);
-		LOGGER.info("Scheduler response " + responseEntity.getStatusCode().toString());
-	}
-
-	
-	@RequestMapping(value = "/publish", method = RequestMethod.POST )
-	public ResponseEntity<Slack> publishToSlack(@RequestBody MultiValueMap<String, String> bodyMap) throws Exception {
-		
-		List<String> inputList  = parseInputArgument(bodyMap);
-		if (inputList == null) {
-			return new ResponseEntity<Slack>(new Slack(SLACK_RESPONSE_TYPE, getUsage()), HttpStatus.OK);
-		}
-		
-		String project = inputList.get(0);
 		ResponseEntity<Slack> responseEntity = timeentry(bodyMap);
 		
-		String endpoint = getSlackWebHookUrl(project);
+		String endpoint = getSlackWebHookUrl(projectName);
 		if (endpoint != null) {
 			String results = "[Auto triggered on " + getCentralTime() + "] \n\n" + responseEntity.getBody().getText();
 			ResponseEntity<String> response = post(endpoint, results);
 			
-			LOGGER.info("published to Slack : " + response.getBody() + " for the project " + project);
+			LOGGER.info("published to Slack : " + response.getBody() + " for the project " + projectName);
 		} else {
-			LOGGER.info("Webhook URL is not defined for " + project);
+			LOGGER.info("Webhook URL is not defined for " + projectName);
 		}
-		
-		return responseEntity;
-		
+		LOGGER.info("Scheduler response for project : " + projectName + " is OK");
 	}
 	
 	private String getSlackWebHookUrl(String project) {
