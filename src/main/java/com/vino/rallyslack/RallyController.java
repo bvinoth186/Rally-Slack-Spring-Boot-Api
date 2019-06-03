@@ -2,11 +2,13 @@ package com.vino.rallyslack;
 
 import java.io.IOException;
 import java.net.URI;
-import java.text.SimpleDateFormat;
+import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
-import java.util.Calendar;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -14,8 +16,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.StringTokenizer;
-import java.util.TimeZone;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.env.Environment;
@@ -24,6 +27,8 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -42,19 +47,21 @@ import com.rallydev.rest.util.QueryFilter;
 
 @RestController
 public class RallyController {
+	
+	private static final Logger LOGGER = LoggerFactory.getLogger(RallyController.class);
+	
+	private static final  DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+	
+    private static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss z");
 
-	private String NO_DATA_FOUND = "No Data Found";
+    private static final  String NO_DATA_FOUND = "No Data Found";
 
-	private String SUCCESS = "Success";
+    private static final  String SUCCESS = "Success";
 	
-	private String DEFAULT_PROJECT = "";
+    private static final  String DEFAULT_PROJECT = "";
+    
+    private static final  String SLACK_RESPONSE_TYPE = "in_channel";
 	
-	private String SLACK_RESPONSE_TYPE = "in_channel";
-	
-	private DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
-	
-	private SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss z");
-
 	@Value("${apikey}")
 	private String apikey;
 	
@@ -91,6 +98,19 @@ public class RallyController {
 			
 		return usage;
 	}
+	
+	@Scheduled(cron = "11 10 * * * *")
+	public void schedule() throws Exception {
+		LOGGER.info("Scheduled at" + new Date());
+	   
+		MultiValueMap<String, String> bodyMap = new LinkedMultiValueMap<String, String>();
+		List<String> inputList = new ArrayList<String>();
+		inputList.add("Brainiacs");
+		bodyMap.put("text", inputList);
+		
+		ResponseEntity<Slack> responseEntity = publishToSlack(bodyMap);
+		LOGGER.info("Scheduler response " + responseEntity.getStatusCode().toString());
+	}
 
 	
 	@RequestMapping(value = "/publish", method = RequestMethod.POST )
@@ -109,9 +129,9 @@ public class RallyController {
 			String results = "[Auto triggered on " + getCentralTime() + "] \n\n" + responseEntity.getBody().getText();
 			ResponseEntity<String> response = post(endpoint, results);
 			
-			System.out.println("published to Slack : " + response.getBody() + " for the project " + project);
+			LOGGER.info("published to Slack : " + response.getBody() + " for the project " + project);
 		} else {
-			System.out.println("Webhook URL is not defined for " + project);
+			LOGGER.info("Webhook URL is not defined for " + project);
 		}
 		
 		return responseEntity;
@@ -126,7 +146,7 @@ public class RallyController {
 	@RequestMapping(value = "/timeentry", method = RequestMethod.POST )
 	public ResponseEntity<Slack> timeentry(@RequestBody MultiValueMap<String, String> bodyMap) throws Exception {
 		
-		System.out.println(bodyMap);
+		LOGGER.info("Post parameters " + bodyMap);
 		logTransactionIntoSlack(bodyMap);
 		
 		List<String> inputList  = parseInputArgument(bodyMap);
@@ -139,7 +159,7 @@ public class RallyController {
 		Map<String, List<Task>>  timeMap = process(project, date);
 		String result = constructResultString(project, date, timeMap);
 		
-		System.out.println("Timesheet data fetched for " + timeMap.size() + " users");
+		LOGGER.info("Timesheet data fetched for " + timeMap.size() + " users");
 		return new ResponseEntity<Slack>(new Slack(SLACK_RESPONSE_TYPE, result), HttpStatus.OK);
 	}
 	
@@ -186,7 +206,7 @@ public class RallyController {
 		
 
 		ResponseEntity<String> response = post(slackChTransaction, transactionLog);
-		System.out.println("logTransactionToSlack : " + response.getBody());
+		LOGGER.info("logTransactionToSlack : " + response.getBody());
 	}
 
 
@@ -233,13 +253,13 @@ public class RallyController {
 
 	private Map<String, List<Task>> process(String project, String date) throws Exception {
 
-		System.out.println("Project : " + project + ", Input Date " + date);
+		LOGGER.info("Project : " + project + ", Input Date " + date);
 		Map<String, List<Task>> timeMap = null;
 		
 		RallyRestApi restApi = null;
 		try {
 			restApi = getRallyRestApi();
-			System.out.println("Rally API " + restApi);
+			LOGGER.info("Rally API " + restApi);
 
 			timeMap = getTimeEntries(restApi, project, date);
 
@@ -260,13 +280,13 @@ public class RallyController {
 		Map<String, List<Task>> timeMap = new HashMap<String, List<Task>>();
 		
 		String projectRef = getProjectRefByName(restApi, projectName);
-		System.out.println("projectRef : " + projectRef);
+		LOGGER.info("projectRef : " + projectRef);
 		if (projectRef == null) {
 			return timeMap;
 		}
 		
 		QueryFilter queryFilter = getQueryFilterStringByDate(date);
-		System.out.println("queryFilter : " + queryFilter);
+		LOGGER.info("queryFilter : " + queryFilter);
 		if (queryFilter == null) {
 			return timeMap;
 		}
@@ -373,14 +393,14 @@ public class RallyController {
 			if (inputDateStr == null) {
 				current = LocalDate.now();
 			} else {
-				current = LocalDate.parse(inputDateStr, formatter);
+				current = LocalDate.parse(inputDateStr, DATE_FORMATTER);
 			}
 
 			LocalDate next = current.plusDays(1);
 			LocalDate prev = current.minusDays(1);
 
-			String nextStr = next.format(formatter);
-			String prevStr = prev.format(formatter);
+			String nextStr = next.format(DATE_FORMATTER);
+			String prevStr = prev.format(DATE_FORMATTER);
 
 			prevStr = "\"" + prevStr + "\"";
 			nextStr = "\"" + nextStr + "\"";
@@ -395,9 +415,10 @@ public class RallyController {
 	
 	private String getTodaysDate() {
 		
-		LocalDate current = LocalDate.now();
-		return current.format(formatter);
-		
+		Instant nowUtc = Instant.now();
+		ZoneId usCentral = ZoneId.of("US/Central");
+		ZonedDateTime centralTime = ZonedDateTime.ofInstant(nowUtc, usCentral);
+		return centralTime.format(DATE_FORMATTER);
 	}
 
 	private String getProjectRefByName(RallyRestApi restApi, String projectName) throws IOException {
@@ -410,6 +431,7 @@ public class RallyController {
 		storyRequest.setQueryFilter(new QueryFilter("Name", "=", projectName));
 
 		QueryResponse storyQueryResponse = restApi.query(storyRequest);
+		
 
 		String projectRef = null;
 		if (storyQueryResponse.getTotalResultCount() > 0) {
@@ -417,6 +439,22 @@ public class RallyController {
 		}
 
 		return projectRef;
+	}
+	
+	private void printAllProjects(RallyRestApi restApi) throws IOException {
+
+		QueryRequest projectRequest = new QueryRequest("project");
+		projectRequest.setFetch(new Fetch("Name", "ObjectID"));
+		
+		QueryResponse projectQueryResponse = restApi.query(projectRequest);
+		JsonArray projectJsonArray = projectQueryResponse.getResults();
+		
+		for (int i = 0; i < projectJsonArray.size(); i++) {
+			JsonObject obj  = projectJsonArray.get(i).getAsJsonObject();
+			String name = obj.get("Name").toString();
+			name = name.replace("\"", "");
+			LOGGER.info(name);
+		}
 	}
 
 	
@@ -430,45 +468,26 @@ public class RallyController {
 	
 	private String getCentralTime() {
 		
-		Calendar cal = Calendar.getInstance();
-		TimeZone timeZone = TimeZone.getTimeZone("GMT");
-        cal.setTimeZone(timeZone);
-        
-        sdf.setTimeZone(timeZone);
-        String gmtDateStr = sdf.format(cal.getTime());
-        
-        // To CST
-        TimeZone cst = TimeZone.getTimeZone("CST");
-        sdf.setTimeZone(cst);
-        
-        return sdf.format(cal.getTime());
-
+		Instant nowUtc = Instant.now();
+		ZoneId usCentral = ZoneId.of("US/Central");
+		ZonedDateTime centralTime = ZonedDateTime.ofInstant(nowUtc, usCentral);
+		return centralTime.format(DATE_TIME_FORMATTER);
 	}
 	
 	public static void main(String args[]) throws Exception {
-		/**RallyController r = new RallyController();
-		List<TimeEntry> timeEntryList =  r.process("Brainiacs", "2019-05-29");
+		RallyController r = new RallyController();
+		/**List<TimeEntry> timeEntryList =  r.process("Brainiacs", "2019-05-29");
 		String result = r.constructResultString("Brainiacs", "2019-05-29", timeEntryList);
 		
-		System.out.println(result);*/
+		LOGGER.info(result);*/
 		
-//		System.out.println(getUsage());
+//		LOGGER.info(getUsage());
 		
+//		r.printAllProjects(r.getRallyRestApi());
 		
-		Calendar cal = Calendar.getInstance();
-		TimeZone timeZone = TimeZone.getTimeZone("GMT");
-        cal.setTimeZone(timeZone);
-        
-        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss z");
-        sdf.setTimeZone(timeZone);
-        String gmtDateStr = sdf.format(cal.getTime());
-        System.out.println("Formatted GMT time = " + gmtDateStr);
-
-        // To CST
-        TimeZone cst = TimeZone.getTimeZone("CST");
-        sdf.setTimeZone(cst);
-
-        System.out.println("FORMATTED CST DATE = " + sdf.format(cal.getTime()));
+		LOGGER.info(r.getTodaysDate());
+		LOGGER.info(r.getCentralTime());
+		
 	    
 	}
 	
