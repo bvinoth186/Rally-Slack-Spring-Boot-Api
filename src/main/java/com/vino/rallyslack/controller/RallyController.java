@@ -1,4 +1,4 @@
-package com.vino.rallyslack;
+package com.vino.rallyslack.controller;
 
 import java.io.IOException;
 import java.net.URI;
@@ -44,6 +44,8 @@ import com.rallydev.rest.request.QueryRequest;
 import com.rallydev.rest.response.QueryResponse;
 import com.rallydev.rest.util.Fetch;
 import com.rallydev.rest.util.QueryFilter;
+import com.vino.rallyslack.bean.Message;
+import com.vino.rallyslack.bean.Task;
 
 @RestController
 public class RallyController {
@@ -119,7 +121,7 @@ public class RallyController {
 		nameList.add("rally-scheduler");
 		bodyMap.put("user_name", nameList);
 		
-		ResponseEntity<Slack> responseEntity = timeentry(bodyMap);
+		ResponseEntity<Message> responseEntity = timeentry(bodyMap);
 		
 		String endpoint = getSlackWebHookUrl(projectName);
 		if (endpoint != null) {
@@ -139,14 +141,14 @@ public class RallyController {
 
 
 	@RequestMapping(value = "/timeentry", method = RequestMethod.POST )
-	public ResponseEntity<Slack> timeentry(@RequestBody MultiValueMap<String, String> bodyMap) throws Exception {
+	public ResponseEntity<Message> timeentry(@RequestBody MultiValueMap<String, String> bodyMap) throws Exception {
 		
 		LOGGER.info("Post parameters " + bodyMap);
 		logTransactionIntoSlack(bodyMap);
 		
 		List<String> inputList  = parseInputArgument(bodyMap);
 		if (inputList == null) {
-			return new ResponseEntity<Slack>(new Slack(SLACK_RESPONSE_TYPE, getUsage()), HttpStatus.OK);
+			return new ResponseEntity<Message>(new Message(SLACK_RESPONSE_TYPE, getUsage()), HttpStatus.OK);
 		}
 		
 		String project = inputList.get(0);
@@ -155,7 +157,7 @@ public class RallyController {
 		String result = constructResultString(project, date, timeMap);
 		
 		LOGGER.info("Timesheet data fetched for " + timeMap.size() + " users");
-		return new ResponseEntity<Slack>(new Slack(SLACK_RESPONSE_TYPE, result), HttpStatus.OK);
+		return new ResponseEntity<Message>(new Message(SLACK_RESPONSE_TYPE, result), HttpStatus.OK);
 	}
 	
 	private List<String> parseInputArgument(MultiValueMap<String, String> bodyMap) {

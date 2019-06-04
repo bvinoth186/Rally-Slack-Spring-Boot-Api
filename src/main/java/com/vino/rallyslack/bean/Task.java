@@ -1,4 +1,4 @@
-package com.vino.rallyslack;
+package com.vino.rallyslack.bean;
 
 public class Task {
 	
